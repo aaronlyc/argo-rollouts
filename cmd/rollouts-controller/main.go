@@ -39,6 +39,7 @@ const (
 	cliName = "argo-rollouts"
 )
 
+// 创建一个命令航对象
 func newCommand() *cobra.Command {
 	var (
 		clientConfig         clientcmd.ClientConfig
@@ -63,31 +64,45 @@ func newCommand() *cobra.Command {
 		namespaced           bool
 		printVersion         bool
 	)
+	// 启动默认的leader程序
+	// 抢锁，正常只有一个运行
 	electOpts := controller.NewLeaderElectionOptions()
 	var command = cobra.Command{
 		Use:   cliName,
 		Short: "argo-rollouts is a controller to operate on rollout CRD",
 		RunE: func(c *cobra.Command, args []string) error {
+			// 打印版本
 			if printVersion {
 				fmt.Println(version.GetVersion())
 				return nil
 			}
+
+			// 设置日志级别
+			// 分为panic, error, warn, info, debug, trace
+			// 默认info
 			setLogLevel(logLevel)
+			// 设置完整的时间戳
 			formatter := &log.TextFormatter{
 				FullTimestamp: true,
 			}
 			log.SetFormatter(formatter)
+			// 设置klog的级别
+			// klog是k8s的默认日志
 			logutil.SetKLogLevel(klogLevel)
+			// 这里初始化的日志带上版本信息
 			log.WithField("version", version.GetVersion()).Info("Argo Rollouts starting")
 
-			// set up signals so we handle the first shutdown signal gracefully
+			// 设置信号，以便我们优雅地处理第一个关闭信号
 			stopCh := signals.SetupSignalHandler()
 
+			// 设置一些默认的值
 			defaults.SetVerifyTargetGroup(awsVerifyTargetGroup)
 			defaults.SetIstioAPIVersion(istioVersion)
 			defaults.SetAmbassadorAPIVersion(ambassadorVersion)
 			defaults.SetSMIAPIVersion(trafficSplitVersion)
 
+			// 调用 client-go 的获取客户端的配置文件方法
+			// 全局客户端
 			config, err := clientConfig.ClientConfig()
 			checkError(err)
 			namespace := metav1.NamespaceAll
@@ -98,8 +113,10 @@ func newCommand() *cobra.Command {
 				log.Infof("Using namespace %s", namespace)
 			}
 
+			// 根据配置文件获取k8s的客户端
 			kubeClient, err := kubernetes.NewForConfig(config)
 			checkError(err)
+			// 获取rollout的clientset客户端
 			argoprojClient, err := clientset.NewForConfig(config)
 			checkError(err)
 			dynamicClient, err := dynamic.NewForConfig(config)
@@ -107,15 +124,23 @@ func newCommand() *cobra.Command {
 			discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 			checkError(err)
 			smiClient, err := smiclientset.NewForConfig(config)
+
+			// 获取 informer 缓存重新同步的时间周期
+			// 默认 15min
 			resyncDuration := time.Duration(rolloutResyncPeriod) * time.Second
+			// 使用附加选项构造 SharedInformerFactory 的新实例
 			kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
 				kubeClient,
 				resyncDuration,
 				kubeinformers.WithNamespace(namespace))
+
+			// 返回对控制器实例进行过滤的标签要求（或不过滤）
 			instanceIDSelector := controllerutil.InstanceIDRequirement(instanceID)
 			instanceIDTweakListFunc := func(options *metav1.ListOptions) {
 				options.LabelSelector = instanceIDSelector.String()
 			}
+
+			// rollout 相关的 job
 			jobInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
 				kubeClient,
 				resyncDuration,

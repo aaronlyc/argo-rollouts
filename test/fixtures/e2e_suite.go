@@ -55,9 +55,9 @@ var (
 
 	E2EALBIngressAnnotations map[string]string
 
-	// All e2e tests will be labeled with this instance-id (unless E2E_INSTANCE_ID="")
+	// E2ELabelValueInstanceID All e2e tests will be labeled with this instance-id (unless E2E_INSTANCE_ID="")
 	E2ELabelValueInstanceID = "argo-rollouts-e2e"
-	// All e2e tests will be labeled with their test name
+	// E2ELabelKeyTestName All e2e tests will be labeled with their test name
 	E2ELabelKeyTestName = "e2e-test-name"
 
 	deploymentGVR = schema.GroupVersionResource{
@@ -77,7 +77,7 @@ var (
 	}
 	pdbGVR = schema.GroupVersionResource{
 		Group:    "policy",
-		Version:  "v1beta1",
+		Version:  "v1",
 		Resource: "poddisruptionbudgets",
 	}
 	jobGVR = schema.GroupVersionResource{
